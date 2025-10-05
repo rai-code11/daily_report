@@ -1,18 +1,111 @@
 ## 取り組んだ課題一覧  
-- 
-- 
-- 
+- Djangoについて理解を深める
 
 ## わかったこと
+### Django: URL の一部をビュー関数の引数に渡す
+
+#### 仕組み（結論）
+- urls.py の path() で `<converter:name>` と書くと、リクエスト URL のその部分がビュー関数の引数 `name` に渡る。
+- 例：`path('user/<str:username>/', views.user)` → `/user/◯◯/` の `◯◯` が `views.user(request, username)` に入る。
+
+---
+
+#### 最小サンプル
+
+##### プロジェクト側 urls.py（config/urls.py）
+    from django.contrib import admin
+    from django.urls import path, include
+
+    urlpatterns = [
+        path('admin/', admin.site.urls),
+        path('app_1/', include('app1.urls')),  # アプリのURLを取り込む
+    ]
+
+##### アプリ側 urls.py（app1/urls.py）
+    from django.urls import path
+    from . import views
+
+    urlpatterns = [
+        path('index/', views.index),
+        path('user/<str:username>/', views.user),  # ここがポイント
+    ]
+
+##### ビュー関数（app1/views.py）
+    from django.http import HttpResponse
+
+    def index(request):
+        return HttpResponse("index")
+
+    def user(request, username):
+        # URL から渡された値がここに入る
+        print(username)  # 例: "YamadaHanako"
+        return HttpResponse(f"Hello, {username}!")
+
+---
+
+#### 動作例（どの値が引数に入るか）
+- アクセス: `/app_1/user/YamadaHanako/`
+  - 実行: `user(request, username="YamadaHanako")`
+- アクセス: `/app_1/user/YamadaTaro/`
+  - 実行: `user(request, username="YamadaTaro")`
+
+---
+
+#### 使えるコンバータ（converter）
+- `str`  : スラッシュ以外の文字（デフォルト）
+- `int`  : 整数（例: `<int:id>` → `id=123`）
+- `slug` : 英数・ハイフン・アンダースコア
+- `uuid` : UUID 形式
+- `path` : スラッシュを含むパス全体（末尾まで取りたいとき）
+
+---
+
+#### 引数名の注意点（重要）
+- **URL 側の引数名とビュー関数側の引数名は一致させる**  
+  例：`path('user/<str:username>/', views.user)` に対して  
+  `def user(request, username): ...` ⭢ OK  
+  `def user(request, name): ...` ⭢ NG（`TypeError: user() missing 1 required positional argument: 'username'` など）
+- **他の引数名と衝突しないようにする**  
+  関数定義の引数名は重複できない。`request` は予約ではないが慣習的に最初の引数として使う。  
+  例：`def user(request, request):` のような重複はもちろん NG。
+- **ビュー側に用意していない引数名は使わない**  
+  URL で `<int:id>` としても、ビューに `id` を受け取る引数が無いと `TypeError`。  
+  逆に、ビューが `id` を要求しているのに URL がそれを渡さなければ同様にエラー。
+- **クラスベースビュー（CBV）の場合**  
+  `def get(self, request, *args, **kwargs):` に渡されるので、`kwargs['username']` などで受け取るか、  
+  `DetailView` なら `pk_url_kwarg` / `slug_url_kwarg` を URL 名と合わせる。
+
+##### 悪い例と良い例
+    # 悪い例：URL名と関数引数が不一致
+    path('user/<str:username>/', views.user)
+    def user(request, name):  # 'username' を定義していない
+        ...
+
+    # 良い例：一致させる
+    path('user/<str:username>/', views.user)
+    def user(request, username):
+        ...
+
+---
+
+#### よくあるハマりどころ
+- 末尾スラッシュ: パターンで `'.../'` と書いたらアクセスも末尾 `/` を付ける
+- 型不一致: `<int:id>` に文字列を入れるとマッチせず 404
+- 順序: 似たパターンは “より具体的なものを上” に書く
+
+---
+
+#### ひとこと
+- 仕組みは「URL で名前をつけた部分を、そのまま関数引数でもらう」だけ。ID・ユーザー名・カテゴリ名などで汎用的に使える。
+- 引数名は **URL とビューで一致**、**重複・不足なし**、これを守れば安定動作する。
 
 
 ## 次やること
-- 
-- 
+- Django_公式チュートリアル提出
 
 ## 感じたこと
-- 
-- 
+- 何度もDjangoの内容について読むと徐々に理解が深まってくる。
+- タスクは後回しにするより怠くてもすぐにやる方が後々楽になる。
 
 ## 学習時間
-- 
+- 5.10h
